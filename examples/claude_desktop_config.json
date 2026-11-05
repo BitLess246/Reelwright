@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "reelwright": {
+      "command": "reelwright",
+      "env": {
+        "REELWRIGHT_HOME": "C:/Users/YOU/Videos/Reelwright"
+      }
+    }
+  }
+}

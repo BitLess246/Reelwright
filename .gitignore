@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.coverage
+# local media and renders
+*.mp4
+*.mov
+*.mkv
+*.wav
+*.mp3
+renders/
