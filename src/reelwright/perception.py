@@ -205,6 +205,23 @@ def waveform(path: str | Path, out: Path, start: float = 0.0, end: float | None 
 
 # ---- transcripts --------------------------------------------------------------
 
+def decode_audio_16k(path: str | Path):
+    """Mono 16 kHz float32 samples (what Whisper models expect), decoded by ffmpeg."""
+    import subprocess
+
+    import numpy as np
+
+    from .ffmpeg import ffmpeg_bin
+    proc = subprocess.run(
+        [ffmpeg_bin(), "-hide_banner", "-nostdin", "-v", "error", "-i", str(path),
+         "-vn", "-ac", "1", "-ar", "16000", "-f", "f32le", "-"],
+        capture_output=True,
+    )
+    if proc.returncode != 0:
+        raise FFmpegError(proc.stderr.decode("utf-8", "replace")[-800:])
+    return np.frombuffer(proc.stdout, dtype=np.float32)
+
+
 def transcribe(path: str | Path, model: str = "base", language: str | None = None,
                cache_dir: Path | None = None) -> dict:
     """Word-timestamped transcript via faster-whisper (optional dependency)."""
@@ -217,8 +234,9 @@ def transcribe(path: str | Path, model: str = "base", language: str | None = Non
                 "Alternatively, import an existing .srt/.vtt file with import_transcript."
             ) from e
         wm = WhisperModel(model, device="auto", compute_type="auto")
-        segments, info = wm.transcribe(str(path), language=language, word_timestamps=True,
-                                       vad_filter=True)
+        # decode with ffmpeg ourselves: avoids PyAV version clashes and handles any format
+        segments, info = wm.transcribe(decode_audio_16k(path), language=language,
+                                       word_timestamps=True, vad_filter=True)
         segs = []
         for s in segments:
             segs.append({
