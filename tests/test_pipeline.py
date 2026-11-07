@@ -123,3 +123,17 @@ def test_multiline_text_file_has_no_carriage_returns(media, reelwright_home, tmp
     canvas, _ = R.resolve_canvas(p, "preview")
     R.build_graph(p, canvas, tmp_path)
     assert (tmp_path / "text_0.txt").read_bytes() == b"line one\nline two"
+
+
+def test_export_preset_keeps_project_fit(media, reelwright_home):
+    from reelwright import render as R
+    from reelwright.store import ProjectStore
+
+    S.create_project("vert", width=1080, height=1920, fit="blur")
+    S.create_project("wide", width=1920, height=1080)
+    vert, wide = ProjectStore.open("vert").load(), ProjectStore.open("wide").load()
+    assert R.resolve_canvas(vert, "shorts")[0].fit == "blur"     # deliberate choice kept
+    assert R.resolve_canvas(wide, "shorts")[0].fit == "cover"    # reframing a 16:9 edit
+    assert R.resolve_canvas(wide, "youtube")[0].fit == "contain"
+    vert.settings.fit = "contain"
+    assert R.resolve_canvas(vert, "shorts")[0].fit == "contain"  # same shape: nothing to reframe

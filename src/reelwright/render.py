@@ -69,7 +69,12 @@ def resolve_canvas(project: Project, preset: str) -> tuple[Canvas, dict]:
     if h is None:
         h = s.height if p["width"] is None else int(round(w * s.height / s.width / 2) * 2)
     fps = min(s.fps, p.get("max_fps", s.fps))
-    return Canvas(int(w), int(h), fps, p.get("fit", s.fit), s.background, s.sample_rate), p
+    # The project's own fit wins when it was chosen deliberately (cover/blur), or when the
+    # project is already this shape. The preset's fit only applies when reframing a
+    # differently shaped "contain" project (e.g. a 16:9 edit exported as a Short).
+    same_shape = abs(w / h - s.width / s.height) < 0.01
+    fit = s.fit if (s.fit != "contain" or same_shape) else p.get("fit", s.fit)
+    return Canvas(int(w), int(h), fps, fit, s.background, s.sample_rate), p
 
 
 # ---- graph building -------------------------------------------------------------
