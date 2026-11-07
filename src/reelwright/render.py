@@ -100,11 +100,24 @@ def build_graph(project: Project, canvas: Canvas, workdir: Path,
     concat_pads: list[str] = []
     n_in = 0
 
-    if canvas.fit == "cover":
-        fit = f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}"
-    else:
-        fit = (f"scale={W}:{H}:force_original_aspect_ratio=decrease,"
-               f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color={canvas.background}")
+    def fit_chain(src: str, i: int, pre: str) -> str:
+        """Filters that place one clip on the canvas; output pad [v{i}]."""
+        if canvas.fit == "blur":
+            # background: the same frame, cropped to fill and blurred; foreground: contained
+            bw, bh = max(2, W // 4 // 2 * 2), max(2, H // 4 // 2 * 2)
+            return (
+                f"{src}{pre}split=2[bg{i}][fg{i}];"
+                f"[bg{i}]scale={bw}:{bh}:force_original_aspect_ratio=increase,crop={bw}:{bh},"
+                f"gblur=sigma=8,eq=brightness=-0.12:saturation=0.9,scale={W}:{H}[bgb{i}];"
+                f"[fg{i}]scale={W}:{H}:force_original_aspect_ratio=decrease[fgs{i}];"
+                f"[bgb{i}][fgs{i}]overlay=(W-w)/2:(H-h)/2,"
+            )
+        if canvas.fit == "cover":
+            fit = f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}"
+        else:
+            fit = (f"scale={W}:{H}:force_original_aspect_ratio=decrease,"
+                   f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color={canvas.background}")
+        return f"{src}{pre}{fit},"
 
     for i, clip in enumerate(project.clips):
         asset = project.asset(clip.asset_id)
@@ -112,16 +125,33 @@ def build_graph(project: Project, canvas: Canvas, workdir: Path,
         if asset.kind == "image":
             inputs += ["-loop", "1", "-framerate", f"{fps:g}", "-t", f"{d:.4f}", "-i", asset.path]
         else:
-            inputs += ["-ss", f"{clip.src_in:.4f}", "-t", f"{d:.4f}", "-i", asset.path]
+            inputs += ["-ss", f"{clip.src_in:.4f}", "-t", f"{clip.source_length:.4f}", "-i", asset.path]
         idx = n_in
         n_in += 1
+        pre = ""
+        if clip.crop:
+            c = clip.crop
+            pre += (f"crop=trunc(iw*{c.w:.4f}/2)*2:trunc(ih*{c.h:.4f}/2)*2:"
+                    f"iw*{c.x:.4f}:ih*{c.y:.4f},")
+        if clip.speed != 1 and asset.kind != "image":
+            pre += f"setpts=(PTS-STARTPTS)/{clip.speed:g},"
         chains.append(
-            f"[{idx}:v]{fit},setsar=1,fps={fps:g},format=yuv420p,"
+            fit_chain(f"[{idx}:v]", i, pre) +
+            f"setsar=1,fps={fps:g},format=yuv420p,"
             f"tpad=stop_mode=clone:stop_duration={d:.4f},trim=duration={d:.4f},setpts=PTS-STARTPTS[v{i}]"
         )
         if asset.has_audio:
+            tempo = ""
+            if clip.speed != 1:
+                parts, sp = [], clip.speed
+                while sp > 2.0:
+                    parts.append("atempo=2.0"); sp /= 2.0
+                while sp < 0.5:
+                    parts.append("atempo=0.5"); sp /= 0.5
+                parts.append(f"atempo={sp:.6g}")
+                tempo = ",".join(parts) + ","
             chains.append(
-                f"[{idx}:a]aresample={sr},aformat=sample_fmts=fltp:channel_layouts=stereo,"
+                f"[{idx}:a]aresample={sr},aformat=sample_fmts=fltp:channel_layouts=stereo,{tempo}"
                 f"volume={clip.volume:g},apad,atrim=duration={d:.4f},asetpts=PTS-STARTPTS[a{i}]"
             )
         else:

@@ -38,16 +38,38 @@ class Asset(BaseModel):
     label: str | None = None
 
 
+class Crop(BaseModel):
+    """Region of the source frame to keep, as fractions of its width/height (0–1)."""
+    x: float = Field(0.0, ge=0, le=1)
+    y: float = Field(0.0, ge=0, le=1)
+    w: float = Field(1.0, gt=0, le=1)
+    h: float = Field(1.0, gt=0, le=1)
+
+
 class Clip(BaseModel):
     id: str = Field(default_factory=lambda: new_id("clip"))
     asset_id: str
     src_in: float = 0.0
     src_out: float
     volume: float = 1.0
+    speed: float = Field(1.0, gt=0)  # 2.0 = twice as fast
+    crop: Crop | None = None
+
+    @property
+    def source_length(self) -> float:
+        return max(0.0, self.src_out - self.src_in)
 
     @property
     def duration(self) -> float:
-        return max(0.0, self.src_out - self.src_in)
+        """Length on the timeline (source length divided by speed)."""
+        return self.source_length / self.speed
+
+    def to_source(self, offset: float) -> float:
+        """Source time for an offset (timeline seconds) into this clip."""
+        return self.src_in + offset * self.speed
+
+    def to_offset(self, source_t: float) -> float:
+        return (source_t - self.src_in) / self.speed
 
 
 Position = Literal["top", "center", "bottom", "lower-third"]
@@ -97,7 +119,7 @@ class Settings(BaseModel):
     height: int = 1080
     fps: float = 30.0
     sample_rate: int = 48000
-    fit: Literal["contain", "cover"] = "contain"
+    fit: Literal["contain", "cover", "blur"] = "contain"
     background: str = "black"
     font_file: str | None = None
 

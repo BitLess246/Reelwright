@@ -6,7 +6,7 @@ Times are in seconds. "Timeline time" means position in the finished video;
 
 from __future__ import annotations
 
-from .models import Clip, MusicCue, Note, Project, TextOverlay, new_id
+from .models import Clip, Crop, MusicCue, Note, Project, TextOverlay, new_id
 
 EPS = 1e-3
 MIN_CLIP = 1 / 60  # anything shorter than ~a frame is dropped
@@ -33,7 +33,7 @@ def locate(project: Project, t: float) -> tuple[int, Clip, float]:
 def timeline_to_source(project: Project, t: float) -> dict:
     i, clip, offset = locate(project, t)
     return {"clip_id": clip.id, "clip_index": i, "asset_id": clip.asset_id,
-            "source_time": _round(clip.src_in + offset)}
+            "source_time": _round(clip.to_source(offset))}
 
 
 def source_to_timeline(project: Project, asset_id: str, source_t: float) -> list[float]:
@@ -41,7 +41,7 @@ def source_to_timeline(project: Project, asset_id: str, source_t: float) -> list
     out = []
     for start, clip in zip(project.clip_starts(), project.clips):
         if clip.asset_id == asset_id and clip.src_in - EPS <= source_t <= clip.src_out + EPS:
-            out.append(_round(start + source_t - clip.src_in))
+            out.append(_round(start + clip.to_offset(source_t)))
     return out
 
 
@@ -59,7 +59,7 @@ def _check_range(project: Project, asset_id: str, src_in: float, src_out: float)
 
 def add_clip(project: Project, asset_id: str, src_in: float = 0.0,
              src_out: float | None = None, index: int | None = None,
-             volume: float = 1.0) -> Clip:
+             volume: float = 1.0, speed: float = 1.0) -> Clip:
     asset = project.asset(asset_id)
     if not asset.has_video and asset.kind != "image":
         raise ValueError(f"{asset_id} has no video stream; use add_music for audio-only assets")
@@ -71,7 +71,10 @@ def add_clip(project: Project, asset_id: str, src_in: float = 0.0,
         else:
             src_out = asset.duration
     _check_range(project, asset_id, src_in, src_out)
-    clip = Clip(asset_id=asset_id, src_in=_round(src_in), src_out=_round(src_out), volume=volume)
+    if not 0.1 <= speed <= 16:
+        raise ValueError("speed must be between 0.1 and 16")
+    clip = Clip(asset_id=asset_id, src_in=_round(src_in), src_out=_round(src_out), volume=volume,
+                speed=speed)
     if index is None or index >= len(project.clips):
         project.clips.append(clip)
     else:
@@ -89,6 +92,24 @@ def trim_clip(project: Project, clip_id: str, src_in: float | None = None,
     return clip
 
 
+def set_speed(project: Project, clip_id: str, speed: float) -> Clip:
+    if not 0.1 <= speed <= 16:
+        raise ValueError("speed must be between 0.1 and 16")
+    _, clip = project.find_clip(clip_id)
+    clip.speed = speed
+    return clip
+
+
+def set_crop(project: Project, clip_id: str, x: float = 0.0, y: float = 0.0,
+             w: float = 1.0, h: float = 1.0) -> Clip:
+    """Keep only a region of the source frame (fractions 0–1). Full frame resets it."""
+    if x + w > 1.0001 or y + h > 1.0001:
+        raise ValueError("crop region extends past the frame (x+w and y+h must be <= 1)")
+    _, clip = project.find_clip(clip_id)
+    clip.crop = None if (x, y, w, h) == (0, 0, 1, 1) else Crop(x=x, y=y, w=w, h=h)
+    return clip
+
+
 def split_at(project: Project, t: float) -> int:
     """Split the clip under timeline time t. Returns the index of the clip that now starts at t."""
     if abs(t) < EPS:
@@ -100,7 +121,7 @@ def split_at(project: Project, t: float) -> int:
         return i
     if clip.duration - offset < EPS:
         return i + 1
-    cut = _round(clip.src_in + offset)
+    cut = _round(clip.to_source(offset))
     tail = clip.model_copy(update={"id": new_id("clip"), "src_in": cut})
     clip.src_out = cut
     project.clips.insert(i + 1, tail)
@@ -245,7 +266,7 @@ def timeline_silences(project: Project, silences_by_asset: dict[str, list[tuple[
         for s, e in silences_by_asset.get(clip.asset_id, []):
             lo, hi = max(s, clip.src_in), min(e, clip.src_out)
             if hi - lo > EPS:
-                out.append((start + lo - clip.src_in, start + hi - clip.src_in))
+                out.append((start + clip.to_offset(lo), start + clip.to_offset(hi)))
     out.sort()
     merged: list[tuple[float, float]] = []
     for s, e in out:

@@ -98,3 +98,35 @@ def test_store_undo_redo(tmp_path):
         with store.edit("bad") as p:
             E.add_clip(p, "a", 5, 2)
     assert store.history()["undo"][-1] == "add clip"  # failed edit saved nothing
+
+
+def test_speed_changes_timeline_length_and_mapping():
+    p = make_project()                       # a: 0-10, b: 1-4 (3 s)
+    E.set_speed(p, p.clips[0].id, 2.0)       # a now lasts 5 s
+    assert p.duration == pytest.approx(8)
+    assert E.timeline_to_source(p, 2.5)["source_time"] == pytest.approx(5)
+    assert E.source_to_timeline(p, "a", 5) == [2.5]
+    idx = E.split_at(p, 2.5)                 # split maps through speed
+    assert (p.clips[0].src_out, p.clips[idx].src_in) == (5, 5)
+    assert p.clips[idx].speed == 2.0
+    E.delete_range(p, 0, 1)                  # 1 s of timeline = 2 s of source
+    assert p.clips[0].src_in == pytest.approx(2)
+    with pytest.raises(ValueError):
+        E.set_speed(p, p.clips[0].id, 50)
+
+
+def test_crop_validation_and_reset():
+    p = make_project()
+    cid = p.clips[0].id
+    E.set_crop(p, cid, 0.2, 0.1, 0.5, 0.8)
+    assert p.clips[0].crop.w == 0.5
+    with pytest.raises(ValueError):
+        E.set_crop(p, cid, 0.6, 0, 0.5, 1)
+    E.set_crop(p, cid)
+    assert p.clips[0].crop is None
+
+
+def test_silences_map_through_speed():
+    p = make_project()
+    E.set_speed(p, p.clips[0].id, 2.0)
+    assert E.timeline_silences(p, {"a": [(4.0, 6.0)]}) == [(2.0, 3.0)]

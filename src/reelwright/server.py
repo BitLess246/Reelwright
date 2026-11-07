@@ -81,7 +81,8 @@ def _summary(store: ProjectStore, project: Project) -> dict:
              "label": project.assets[c.asset_id].label,
              "timeline_start": round(s, 3), "timeline_end": round(s + c.duration, 3),
              "src_in": c.src_in, "src_out": c.src_out, "duration": round(c.duration, 3),
-             "volume": c.volume}
+             "volume": c.volume, "speed": c.speed,
+             "crop": c.crop.model_dump() if c.crop else None}
             for i, (s, c) in enumerate(zip(starts, project.clips))
         ],
         "overlays": [o.model_dump() for o in project.overlays],
@@ -119,9 +120,10 @@ def list_projects() -> dict:
 
 @mcp.tool()
 def create_project(name: str, width: int = 1920, height: int = 1080, fps: float = 30.0,
-                   fit: Literal["contain", "cover"] = "contain") -> dict:
+                   fit: Literal["contain", "cover", "blur"] = "contain") -> dict:
     """Create a new project. width/height/fps define the canvas; `fit` controls how
-    sources with a different aspect ratio are placed (contain = letterbox, cover = crop)."""
+    sources with a different aspect ratio are placed (contain = letterbox, cover = crop,
+    blur = contained over a blurred fill — the usual way to put 16:9 footage in a 9:16 reel)."""
     store = ProjectStore.create(name, width=width, height=height, fps=fps, fit=fit)
     return _summary(store, store.load())
 
@@ -135,7 +137,7 @@ def get_timeline(project: str) -> dict:
 
 @mcp.tool()
 def update_settings(project: str, width: int | None = None, height: int | None = None,
-                    fps: float | None = None, fit: Literal["contain", "cover"] | None = None,
+                    fps: float | None = None, fit: Literal["contain", "cover", "blur"] | None = None,
                     background: str | None = None, font_file: str | None = None) -> dict:
     """Change canvas settings (resolution, fps, fit, background colour, font file for text)."""
     store = _store(project)
@@ -310,12 +312,12 @@ def get_transcript(project: str, asset_id: str | None = None, start: float = 0.0
 
 @mcp.tool()
 def add_clip(project: str, asset_id: str, src_in: float = 0.0, src_out: float | None = None,
-             index: int | None = None, volume: float = 1.0) -> dict:
+             index: int | None = None, volume: float = 1.0, speed: float = 1.0) -> dict:
     """Place [src_in, src_out] of an asset on the main track (appends unless `index` is given).
-    Images default to 5 seconds."""
+    Images default to 5 seconds. speed 2.0 plays it twice as fast (half the timeline length)."""
     store = _store(project)
     with store.edit(f"add clip from {asset_id}") as p:
-        clip = E.add_clip(p, asset_id, src_in, src_out, index, volume)
+        clip = E.add_clip(p, asset_id, src_in, src_out, index, volume, speed)
     return _edit_result(store, "Clip added", clip=clip.model_dump())
 
 
@@ -374,6 +376,29 @@ def set_clip_volume(project: str, clip_id: str, volume: float) -> dict:
     with store.edit(f"volume {clip_id}") as p:
         p.find_clip(clip_id)[1].volume = max(0.0, volume)
     return _edit_result(store, "Volume set")
+
+
+@mcp.tool()
+def set_clip_speed(project: str, clip_id: str, speed: float) -> dict:
+    """Change a clip's playback speed (0.1–16; 2.0 = twice as fast). Audio pitch is kept.
+    The timeline ripples to the new length."""
+    store = _store(project)
+    with store.edit(f"speed {clip_id} x{speed:g}") as p:
+        clip = E.set_speed(p, clip_id, speed)
+    return _edit_result(store, f"Speed set to {speed:g}x", clip=clip.model_dump())
+
+
+@mcp.tool()
+def set_clip_crop(project: str, clip_id: str, x: float = 0.0, y: float = 0.0,
+                  w: float = 1.0, h: float = 1.0) -> dict:
+    """Zoom into a region of the source frame for this clip. x, y, w, h are fractions of the
+    source width/height (top-left origin), e.g. x=0.1 y=0.15 w=0.5 h=0.7. The region is then
+    fitted to the canvas using the project's fit mode. Defaults reset to the full frame.
+    Use inspect_media first to choose the region."""
+    store = _store(project)
+    with store.edit(f"crop {clip_id}") as p:
+        clip = E.set_crop(p, clip_id, x, y, w, h)
+    return _edit_result(store, "Crop reset" if clip.crop is None else "Crop set", clip=clip.model_dump())
 
 
 @mcp.tool()

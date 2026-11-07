@@ -82,7 +82,7 @@ def project_payload(name: str) -> dict:
         "clips": [
             {"id": c.id, "index": i, "asset_id": c.asset_id, "label": p.assets[c.asset_id].label,
              "kind": p.assets[c.asset_id].kind, "start": round(s, 3), "end": round(s + c.duration, 3),
-             "src_in": c.src_in, "src_out": c.src_out, "volume": c.volume}
+             "src_in": c.src_in, "src_out": c.src_out, "volume": c.volume, "speed": c.speed}
             for i, (s, c) in enumerate(zip(starts, p.clips))
         ],
         "overlays": [o.model_dump() for o in p.overlays],

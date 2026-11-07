@@ -30,15 +30,15 @@ def timeline_words(project: Project, transcripts: dict[str, dict]) -> list[dict]
                     mid = (w["start"] + w["end"]) / 2
                     if clip.src_in <= mid < clip.src_out:
                         items.append({
-                            "start": start + max(w["start"], clip.src_in) - clip.src_in,
-                            "end": start + min(w["end"], clip.src_out) - clip.src_in,
+                            "start": start + clip.to_offset(max(w["start"], clip.src_in)),
+                            "end": start + clip.to_offset(min(w["end"], clip.src_out)),
                             "text": w["word"], "clip_id": clip.id,
                         })
             else:
                 lo, hi = max(seg["start"], clip.src_in), min(seg["end"], clip.src_out)
                 # keep a segment only if most of it survived the edit
                 if hi - lo > 0.5 * (seg["end"] - seg["start"]):
-                    items.append({"start": start + lo - clip.src_in, "end": start + hi - clip.src_in,
+                    items.append({"start": start + clip.to_offset(lo), "end": start + clip.to_offset(hi),
                                   "text": seg["text"], "clip_id": clip.id, "segment": True})
     items.sort(key=lambda x: x["start"])
     return items

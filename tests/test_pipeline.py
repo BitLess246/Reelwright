@@ -91,3 +91,21 @@ def test_notes_and_mcp_roundtrip(project):
     content = getattr(result, "content", result)
     payload = json.loads(content[0].text)
     assert payload["clips"][0]["asset_id"] == project["talk"]
+
+
+def test_speed_crop_and_blur_fit_render(media, reelwright_home):
+    from PIL import Image as PILImage
+
+    S.create_project("reel", width=360, height=640, fps=30, fit="blur")
+    aid = S.import_media("reel", [str(media["talk"])])["added"][0]["id"]
+    clip = S.add_clip("reel", aid, 0, 6, speed=3.0)["clip"]
+    assert S.get_timeline("reel")["duration"] == pytest.approx(2.0)
+    out = S.render_preview("reel")
+    assert _duration(out["path"]) == pytest.approx(2.0, abs=0.1)
+
+    # crop to the left third of testsrc2 and check the frame really changed
+    a = PILImage.open(S.check_frames("reel", [1.0])[0]["image"]).convert("L").resize((64, 64))
+    S.set_clip_crop("reel", clip["id"], x=0.0, y=0.0, w=0.34, h=1.0)
+    b = PILImage.open(S.check_frames("reel", [1.0])[0]["image"]).convert("L").resize((64, 64))
+    diff = sum(abs(x - y) for x, y in zip(a.tobytes(), b.tobytes())) / (64 * 64)
+    assert diff > 10

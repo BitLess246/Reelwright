@@ -15,7 +15,8 @@ Everything renders locally with ffmpeg, so footage never leaves your machine.
 | Area | What it does |
 |---|---|
 | Perception | Contact sheets of any source range, scene-change detection, silence detection, EBU R128 loudness curves, waveform images, transcripts (faster-whisper or imported `.srt`/`.vtt`) |
-| Editing | Add, trim, split, move and delete clips; ripple-delete any timeline range across clip boundaries; one-call silence removal with padding; per-clip volume |
+| Editing | Add, trim, split, move and delete clips; ripple-delete any timeline range across clip boundaries; one-call silence removal with padding; per-clip volume, speed (0.1–16×) and crop |
+| Reframing | `blur` fit puts 16:9 footage on a blurred fill for 9:16 reels; per-clip crop zooms into the action |
 | Layers | Text overlays (top, center, bottom, lower-third), background music with automatic ducking under speech, fades |
 | Captions | Generated from transcripts and kept in sync with the edit; burned in or exported as `.srt` |
 | Review UI | A local web page to watch the edit, scrub the timeline and pin notes like "cut this pause" for the agent; updates live as the agent edits |
@@ -94,6 +95,7 @@ render_preview (a range) → export preset=youtube → export preset=shorts
 | `audio_loudness`, `audio_waveform` | Loudness curve and LUFS, or a waveform image, for an asset or a render |
 | `transcribe`, `import_transcript`, `get_transcript` | Word-timestamped transcripts; read in source time or as the edited timeline |
 | `add_clip`, `trim_clip`, `split_clip`, `delete_clip`, `delete_range`, `move_clip`, `set_clip_volume` | Main-track editing (ripple) |
+| `set_clip_speed`, `set_clip_crop` | Speed ramps and zoom-in reframing per clip |
 | `remove_silences` | Detect and cut dead air across the timeline; supports `dry_run` |
 | `add_text`, `update_text`, `remove_text` | Text overlays |
 | `add_music`, `remove_music` | Background audio with ducking and fades |

@@ -414,7 +414,7 @@ function renderClips() {
       <div class="meta"><span class="mono">#${c.index + 1}</span><span style="width:10px;height:10px;border-radius:2px;background:${hue(c.asset_id)}"></span>
         <span class="mono">${fmt(c.start)} – ${fmt(c.end)}</span></div>
       <div class="text">${esc(c.label)}</div>
-      <div class="meta mono">source ${fmt(c.src_in)} – ${fmt(c.src_out)}${c.volume !== 1 ? ` · vol ${c.volume}` : ""}</div>
+      <div class="meta mono">source ${fmt(c.src_in)} – ${fmt(c.src_out)}${c.speed !== 1 ? ` · ${c.speed}×` : ""}${c.volume !== 1 ? ` · vol ${c.volume}` : ""}</div>
     </div>`).join("") : `<div class="hint">No clips on the timeline yet.</div>`;
 }
 
