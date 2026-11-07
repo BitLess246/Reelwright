@@ -90,5 +90,5 @@ def write_srt(cues: list[dict], out: Path) -> Path:
     for i, c in enumerate(cues, 1):
         lines += [str(i), f"{_srt_time(c['start'])} --> {_srt_time(c['end'])}", c["text"], ""]
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text("\n".join(lines), encoding="utf-8")
+    out.write_bytes("\n".join(lines).encode("utf-8"))
     return out

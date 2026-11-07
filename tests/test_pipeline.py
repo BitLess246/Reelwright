@@ -109,3 +109,17 @@ def test_speed_crop_and_blur_fit_render(media, reelwright_home):
     b = PILImage.open(S.check_frames("reel", [1.0])[0]["image"]).convert("L").resize((64, 64))
     diff = sum(abs(x - y) for x, y in zip(a.tobytes(), b.tobytes())) / (64 * 64)
     assert diff > 10
+
+
+def test_multiline_text_file_has_no_carriage_returns(media, reelwright_home, tmp_path):
+    from reelwright import render as R
+    from reelwright.store import ProjectStore
+
+    S.create_project("txt", width=320, height=180)
+    aid = S.import_media("txt", [str(media["talk"])])["added"][0]["id"]
+    S.add_clip("txt", aid, 0, 1)
+    S.add_text("txt", "line one\nline two", 0, 1)
+    p = ProjectStore.open("txt").load()
+    canvas, _ = R.resolve_canvas(p, "preview")
+    R.build_graph(p, canvas, tmp_path)
+    assert (tmp_path / "text_0.txt").read_bytes() == b"line one\nline two"

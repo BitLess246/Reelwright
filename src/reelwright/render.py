@@ -168,7 +168,9 @@ def build_graph(project: Project, canvas: Canvas, workdir: Path,
     for k, ov in enumerate(project.overlays):
         if ov.start >= total:
             continue
-        (workdir / f"text_{k}.txt").write_text(ov.text, encoding="utf-8")
+        # bytes, not text mode: on Windows text mode turns \n into \r\n and drawtext
+        # renders the \r as an extra blank line
+        (workdir / f"text_{k}.txt").write_bytes(ov.text.replace("\r\n", "\n").encode("utf-8"))
         x, y = POSITIONS[ov.position]
         opts = [
             *( [f"fontfile={escape_filter_value(font)}"] if font else [] ),
