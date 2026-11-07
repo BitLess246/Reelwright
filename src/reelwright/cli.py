@@ -2,6 +2,7 @@
 
     reelwright                      run the MCP server over stdio (what MCP clients call)
     reelwright serve --http         run over streamable HTTP instead
+    reelwright review [project]     open the review UI in your browser
     reelwright doctor               check ffmpeg, filters, fonts and optional extras
     reelwright info <project>       print the timeline summary
     reelwright note <project> <time> <text>   leave review feedback for the agent
@@ -52,6 +53,10 @@ def main(argv: list[str] | None = None) -> None:
     sub = parser.add_subparsers(dest="cmd")
     serve = sub.add_parser("serve", help="run the MCP server (default)")
     serve.add_argument("--http", action="store_true", help="use streamable HTTP instead of stdio")
+    rev = sub.add_parser("review", help="open the local review UI in your browser")
+    rev.add_argument("project", nargs="?")
+    rev.add_argument("--port", type=int, default=8765)
+    rev.add_argument("--no-browser", action="store_true")
     sub.add_parser("doctor", help="check the environment")
     info = sub.add_parser("info", help="print a project's timeline")
     info.add_argument("project")
@@ -68,6 +73,9 @@ def main(argv: list[str] | None = None) -> None:
     if args.cmd in (None, "serve"):
         from .server import mcp
         mcp.run("streamable-http" if getattr(args, "http", False) else "stdio")
+    elif args.cmd == "review":
+        from .review import serve_forever
+        serve_forever(args.project, port=args.port, open_browser=not args.no_browser)
     elif args.cmd == "doctor":
         sys.exit(_doctor())
     elif args.cmd == "info":

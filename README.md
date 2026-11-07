@@ -18,7 +18,7 @@ Everything renders locally with ffmpeg, so footage never leaves your machine.
 | Editing | Add, trim, split, move and delete clips; ripple-delete any timeline range across clip boundaries; one-call silence removal with padding; per-clip volume |
 | Layers | Text overlays (top, center, bottom, lower-third), background music with automatic ducking under speech, fades |
 | Captions | Generated from transcripts and kept in sync with the edit; burned in or exported as `.srt` |
-| Review | Notes pinned to timeline times, so a human can leave feedback like "cut this pause" for the agent |
+| Review UI | A local web page to watch the edit, scrub the timeline and pin notes like "cut this pause" for the agent; updates live as the agent edits |
 | Output | Low-res range previews; exports for YouTube 1080p/4K, Shorts 9:16 and square, with -14 LUFS loudness normalisation; GPU encoders (NVENC, QSV, AMF, VideoToolbox) |
 
 ## Requirements
@@ -99,6 +99,7 @@ render_preview (a range) → export preset=youtube → export preset=shorts
 | `add_music`, `remove_music` | Background audio with ducking and fades |
 | `set_captions` | Captions from transcripts, burned in or as `.srt` |
 | `add_note`, `list_notes`, `resolve_note` | Review notes pinned to timeline times |
+| `open_review` | Start the local review UI and open it in the browser |
 | `check_frames`, `timeline_contact_sheet` | Frames of the edited timeline for self-checking (image) |
 | `render_preview`, `export` | Low-res range previews and final exports |
 
@@ -118,10 +119,26 @@ A project is one `project.json`:
   renders/         previews and exports
 ```
 
+## Review UI
+
+```bash
+reelwright review beam-lesson
+```
+
+This opens a page on `http://localhost:8765` (local only). The agent can also open it with the `open_review` tool.
+
+- **Watch** a low-res preview of the edit. A badge tells you when the agent has changed the edit since the last render; one click re-renders.
+- **Scrub** the timeline: video clips, text overlays, music and notes each get their own lane. Click any transcript line or clip to jump there.
+- **Leave notes**: pause, press <kbd>N</kbd>, type what you want changed, press <kbd>Enter</kbd>. The note is pinned to that moment, and the agent reads it with `list_notes`. Agent notes (questions for you) show up in blue.
+- **Undo/redo** the agent's edits from the page.
+
+Keys: <kbd>Space</kbd> play/pause, <kbd>←</kbd>/<kbd>→</kbd> 1 s (<kbd>Shift</kbd> for 5 s), <kbd>,</kbd>/<kbd>.</kbd> one frame, <kbd>N</kbd> new note, <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo.
+
 ## CLI
 
 ```bash
 reelwright doctor                          # environment check
+reelwright review beam-lesson              # open the review UI
 reelwright info beam-lesson                # print the timeline
 reelwright note beam-lesson 42.5 "cut this pause"   # leave feedback for the agent
 reelwright export beam-lesson --preset shorts --encoder h264_nvenc
@@ -138,7 +155,7 @@ The tests generate small synthetic clips with ffmpeg, so no media files are need
 
 ## Roadmap
 
-- [ ] Local review UI: scrub the timeline in a browser and leave notes
+- [x] Local review UI: scrub the timeline in a browser and leave notes
 - [ ] Filler-word removal ("um", "uh") from word timestamps
 - [ ] Transitions (crossfade, dip to black) and Ken Burns on images
 - [ ] Picture-in-picture and B-roll overlay track

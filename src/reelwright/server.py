@@ -34,6 +34,9 @@ Typical loop:
    whole edit, render_preview for a low-res MP4 of a range.
 5. export with a preset (youtube, shorts, square, youtube_4k, project).
 
+open_review starts a local web page where the human watches the edit and pins notes;
+check list_notes for their feedback.
+
 Times are seconds. Clip src_in/src_out are positions inside the source file;
 timeline times are positions in the finished video. get_timeline shows both.
 Check list_notes for human feedback pinned to timeline times.
@@ -558,6 +561,23 @@ def export(project: str, preset: Literal["youtube", "youtube_4k", "shorts", "squ
         if cues:
             result["srt"] = str(cap.write_srt(cues, out.with_suffix(".srt")))
     return result
+
+
+# ---- review UI -----------------------------------------------------------------------------
+
+@mcp.tool()
+def open_review(project: str | None = None, open_browser: bool = True) -> dict:
+    """Start the local review UI (a web page on this machine) and optionally open it in the
+    browser. The human can watch a preview, scrub the timeline and pin notes for you; read
+    them with list_notes. The page updates live as you edit."""
+    from . import review
+    if project:
+        _store(project)  # validate the name
+    url = review.url_for(review.start(), project)
+    if open_browser:
+        import webbrowser
+        webbrowser.open(url)
+    return {"url": url, "hint": "Notes left in the page appear in list_notes."}
 
 
 def main() -> None:
